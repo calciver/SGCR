@@ -45,34 +45,18 @@ model.compile(loss="categorical_crossentropy",
               metrics=["categorical_accuracy"])
 
 
-csv_files_dir = '/home/mashids/Documents/CNN_Weakly_supervised/resized_images/info'
+csv_files_dir = '/home/mashids/Documents/CNN_Weakly_supervised/resized_images/csv'
 train_image_file_dir = '/home/mashids/Documents/CNN_Weakly_supervised/resized_images/train'
 val_image_file_dir = '/home/mashids/Documents/CNN_Weakly_supervised/resized_images/val'
 val_csv_filename = 'val.csv'
-test_csv_filename = 'test.csv'
 train_csv_filename = 'train.csv'
 
+batch_size_train= 400
+batch_size_val = 400
+num_epochs = 5
 
-batch_size= 100
-num_epochs = 2
-train_acc_epoch=[]
-train_loss_epoch=[]
-val_acc_epoch = []
-val_loss_epoch = []
 
 #################### Shuffle the csv file ####################################
-def prepare_batches(imagename_label_pairs, batch_size):
-    batch_list = []
-    for i in range(0, len(imagename_label_pairs), batch_size):
-
-        batch = imagename_label_pairs[i:i + batch_size]
-        if len(batch) % batch_size != 0:
-            m = batch_size - len(batch)
-            for j in range(m):
-                batch.append(imagename_label_pairs[j])
-
-        batch_list.append(batch)
-    return batch_list
 
 def load_data (batch, image_dir):
     image_array = []
@@ -111,10 +95,10 @@ def save_model(model, dir, epoch=None, val_loss=None):
     if not os.path.exists(model_directory):
         os.mkdir(model_directory)
 
-    model_filename_json =  "%s/save_model/model_epoch_%d_validation_loss_%0.3f.json" % (dir, epoch, val_loss)
+    model_filename_json =  "%s/save_model/updated_model_epoch_%d_validation_loss_%0.3f.json" % (dir, epoch, val_loss)
     print(model_filename_json)
 
-    model_filename_h5 = "%s/save_model/model_epoch_%d_validation_loss_%0.3f.h5" % (dir, epoch, val_loss)
+    model_filename_h5 = "%s/save_model/updated_model_epoch_%d_validation_loss_%0.3f.h5" % (dir, epoch, val_loss)
 
     with open(model_filename_json, "w") as json_file:
         json_file.write(model_json)
@@ -126,95 +110,46 @@ def save_model(model, dir, epoch=None, val_loss=None):
 train_imagename_label_pairs = load_csv(csv_files_dir, train_csv_filename)
 val_imagename_label_pairs = load_csv(csv_files_dir, val_csv_filename)
 
-val_batch_list = prepare_batches(val_imagename_label_pairs, batch_size)
+#-----------------------------------train data ---------------------------------------------------
+train_acc = []
+train_loss=[]
+random.shuffle(train_imagename_label_pairs)
+[train_images, train_labels] = load_data(train_imagename_label_pairs, train_image_file_dir)
 
-print(len(val_batch_list))
+image_shape = train_images.shape
+print("train_images.shape" , train_images.shape)
+train_images2 = np.reshape(train_images, [-1, image_shape[1], image_shape[2], 1])
+train_labels1 = to_categorical(train_labels)
+train_labels2 = np.reshape(train_labels1, [batch_size_train, 2])
 
-for epoch in range(num_epochs):
-    random.shuffle(train_imagename_label_pairs) 
-    train_batch_list = prepare_batches(train_imagename_label_pairs, batch_size)
+#--------------------------------validation data-------------------------------------------
+val_acc=[]
+val_loss =[]
+random.shuffle(val_imagename_label_pairs)
+[val_images, val_labels] = load_data(val_imagename_label_pairs, val_image_file_dir)
 
-#-----------------------------------train model ---------------------------------------------------
+image_shape = val_images.shape
+print("val_images.shape" , val_images.shape)
+val_images2 = np.reshape(val_images, [-1, image_shape[1], image_shape[2], 1])
+val_labels1 = to_categorical(val_labels)
+val_labels2 = np.reshape(val_labels1, [batch_size_val, 2])
 
-    accu = 0
-    loss = 0
+history = model.fit(x=train_images2, y=train_labels2,  epochs = num_epochs ,batch_size=10, validation_data=[val_images2, val_labels2], shuffle=True, verbose=2)
 
-    for k in range(len(train_batch_list)):
-        print("epoch : ", epoch , "training batch : ", k )
-
-        [train_images, train_labels] = load_data(train_batch_list[k], train_image_file_dir)
-
-        image_shape = train_images.shape
-        train_images2 = np.reshape(train_images, [-1, image_shape[1], image_shape[2], 1])
-        train_labels1 = to_categorical(train_labels)
-        train_labels2 = np.reshape(train_labels1, [batch_size, 2])
-
-        history = model.fit(x=train_images2, y=train_labels2, batch_size=batch_size)
-        accu= accu + history.history['categorical_accuracy'][0]
-        loss= loss+ history.history['loss'][0]
-
-
-    accu = accu / len(train_batch_list)
-    loss = loss / len(train_batch_list)
-
-    train_acc_epoch.append(accu)
-    train_loss_epoch.append(loss)
-
- #-------------------------------------validate model-----------------------------------------
-
-    accu = 0
-    loss = 0
-
-    for k in range(1): #range(len(val_batch_list)):
-        print("epoch : ", epoch, "validation batch : ", k)
-
-        [val_images, val_labels] = load_data(val_batch_list[k], val_image_file_dir)
-
-        image_shape = val_images.shape
-        val_images2 = np.reshape(val_images, [-1, image_shape[1], image_shape[2], 1])
-        val_labels1 = to_categorical(val_labels)
-        val_labels2 = np.reshape(val_labels1, [batch_size, 2])
-
-        history = model.evaluate(x=val_images2, y=val_labels2, batch_size=batch_size)
-        accu = accu + history[0]
-        loss = loss + history[1]
-
-    accu = accu / batch_size
-    loss = loss / batch_size
-    val_acc_epoch.append(accu)
-    val_loss_epoch.append(loss)
-
-#------------------------save model, loss and accuracies-------------------------------------
-
-dir = os.getcwd()
-save_model(model, dir, epoch, val_acc_epoch[-1])
-
-train_acc_filename = "train_accu.npy"
-np.save(train_acc_filename, train_acc_epoch)
-
-train_loss_filename = "train_loss.npy"
-np.save(train_loss_filename, train_loss_epoch)
-
-val_acc_filename = "val_accu.npy"
-np.save(val_acc_filename, val_acc_epoch)
-
-val_loss_filename = "val_loss.npy"
-np.save(val_loss_filename, val_loss_epoch)
-
-#------------------plot train and validation accuracies and losses---------------------
-
-
-subplot(2,1,1)
-plt.plot(train_acc_epoch)
-plt.plot(val_acc_epoch)
-plt.legend(['Train accuracy', 'Validation accuracy'], loc='upper left')
-plt.title('accuracy')
-#plt.show()
-
-subplot(2,1,2)
-
-plt.plot(train_loss_epoch)
-plt.plot(val_loss_epoch)
-plt.legend(['Train loss', 'Validation loss'], loc='upper left')
-plt.title('loss')
+print(history.history.keys())
+# summarize history for accuracy
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
 plt.show()
