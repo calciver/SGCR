@@ -3,5 +3,5 @@ Objectives:
 The goal of this project is to classify images in a dataset of chest xray images into 2 categories, namely, healthy subjects and diseased patients with no lung opacity.
 
 The images are downsampled to constant size of 512*512 pixel and can be dowloaded from the following link:
-https://drive.google.com/file/d/1VzOMpPsyIVyKE_pnYpeZiisANUsP0KOj/view?usp=drive_web
+https://www.dropbox.com/s/9ynadugwhdy7zsu/train_and_val_images.zip?dl=0
 
